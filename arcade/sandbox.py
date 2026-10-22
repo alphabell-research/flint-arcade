@@ -99,6 +99,11 @@ def sandbox_command(input_path: Path, output_dir: Path, chromium: str):
             command += ["--ro-bind", path, path]
     if browser.is_relative_to(Path("/opt/google/chrome")):
         command += ["--ro-bind", "/opt/google/chrome", "/opt/google/chrome"]
+    # Hosted Python distributions can live outside /usr. Bind only the trusted
+    # interpreter installation, never its surrounding home or tool-cache tree.
+    base = Path(sys.base_prefix).resolve()
+    if not base.is_relative_to(Path('/usr')) and not base.is_relative_to(Path('/opt/google/chrome')):
+        command += ["--ro-bind", str(base), str(base)]
     command += ["--ro-bind", str(venv), str(venv), "--ro-bind", str(Path(__file__).with_name("browser_worker.py").resolve()), "/app/browser_worker.py", "--ro-bind", str(input_path.resolve()), "/input/game.html", "--bind", str(output_dir.resolve()), "/output", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--dir", "/home/browser", "--setenv", "HOME", "/home/browser", "--setenv", "PATH", "/usr/bin", "--setenv", "LANG", "C.UTF-8", "--setenv", "PYTHONDONTWRITEBYTECODE", "1", "--chdir", "/tmp", str(Path(sys.executable)), "/app/browser_worker.py", str(browser)]
     return command
 
