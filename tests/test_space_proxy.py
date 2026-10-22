@@ -166,3 +166,27 @@ def test_known_fonts_and_previews_are_bounded_assets(path):
     with client_for(handle) as client:
         assert client.get(path).content == b"asset"
     assert calls == ["https://alphabell.com/arcade" + path]
+
+
+@pytest.mark.parametrize("query", ["__theme=system", "__theme=light", "__theme=dark", "__theme=%73ystem"])
+def test_hugging_face_theme_query_loads_root_without_forwarding_query(query):
+    calls = []
+    def handle(request):
+        calls.append(str(request.url))
+        return httpx.Response(200, text='<base href="/arcade/"><h1>Arcade</h1>')
+    with client_for(handle) as client:
+        response = client.get("/?" + query)
+        assert response.status_code == 200
+        assert '<base href="/">' in response.text
+    assert calls == ["https://alphabell.com/arcade/"]
+
+
+@pytest.mark.parametrize("path", ["/?__theme=system&__theme=dark", "/?__theme=system&url=https://evil.invalid", "/?__theme=other", "/?__theme=", "/?__theme", "/?%5f%5ftheme=system", "/?__theme=system;url=evil", "/api/config?__theme=system", "/g/moon?__theme=system"])
+def test_theme_query_rejects_duplicates_unknown_values_and_nonroot_routes(path):
+    calls = []
+    def handle(request):
+        calls.append(request)
+        return httpx.Response(200)
+    with client_for(handle) as client:
+        assert client.get(path).status_code == 404
+    assert not calls

@@ -11,7 +11,7 @@ import os
 import re
 import secrets
 import time
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
@@ -154,7 +154,14 @@ def create_app(settings=None, transport=None):
         if settings.space_host and request.url.hostname != settings.space_host:
             return JSONResponse({"detail": "Not found."}, status_code=404)
         is_asset = public_path in ASSETS or bool(ASSET_ROUTES.fullmatch(public_path))
-        if b"%" in request.scope.get("raw_path", b"") or request.url.query or (not is_asset and not ROUTES.fullmatch(public_path)):
+        query_ok = not request.url.query
+        if public_path == "/" and request.url.query:
+            try:
+                pairs = parse_qsl(request.url.query, keep_blank_values=True, strict_parsing=True)
+                query_ok = request.url.query.partition("=")[0] == "__theme" and len(pairs) == 1 and pairs[0][0] == "__theme" and pairs[0][1] in {"system", "light", "dark"}
+            except ValueError:
+                query_ok = False
+        if b"%" in request.scope.get("raw_path", b"").split(b"?", 1)[0] or not query_ok or (not is_asset and not ROUTES.fullmatch(public_path)):
             return JSONResponse({"detail": "Not found."}, status_code=404)
         is_post = request.method == "POST"
         if is_post and public_path != "/api/jobs":

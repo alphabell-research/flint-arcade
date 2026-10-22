@@ -908,6 +908,7 @@ textarea:focus-visible {
   padding-right:10px;
 }
 .toast {
+  pointer-events:none;
   position:fixed;
   z-index:50;
   bottom:26px;
@@ -1221,7 +1222,7 @@ textarea:focus-visible {
     padding-top:30px;
   }
   .remix-heading p br {
-    display:none;
+    display:initial;
   }
   .remix-heading h2 {
     font-size:26px;
