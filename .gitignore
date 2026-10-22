@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+*.pyc
+.env
+data/
+builds/
+*.sqlite*
+*.db
+session-signing-key
