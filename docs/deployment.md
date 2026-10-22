@@ -4,13 +4,27 @@ The web application and game validator are separate from model inference. The ap
 
 ## Hugging Face
 
-A Docker Space can host the application and its validation worker. Listen on `0.0.0.0` at the port declared in the Space configuration, conventionally 7860. Store authentication values in Space secrets. Run one application worker when using an in-process queue or local SQLite state.
+The selected deployment uses a Docker Space as a bounded same-origin gateway to [the canonical alphaBell application](https://alphabell.com/arcade/). The durable database and Bubblewrap browser validator stay on the alphaBell backend. The Space runs neither the model nor the browser validator and holds no Hugging Face token.
+
+The gateway listens on port 7860 as a nonprivileged user. `ARCADE_ORIGIN` is restricted to the canonical alphaBell Arcade URL. `ARCADE_EDGE_SECRET` must match the backend secret. Keep it in Space secrets and outside source control. Run one gateway worker and one primary application worker.
 
 The default CPU environment has 2 CPU cores, 16 GB memory and 50 GB ephemeral disk. It can support a lightweight web service and bounded browser checks; it is not the inference host for the full Flint Q8_0 checkpoint. Compute Spaces require a qualifying paid plan to create. [Spaces overview](https://huggingface.co/docs/hub/spaces-overview), [Docker Spaces](https://huggingface.co/docs/hub/spaces-sdks-docker).
 
-Space container storage can disappear on restart. Use a durable external database or a mounted storage bucket for game records and generated files before promising permanent share links. Keep the release's bundled gallery independent from mutable visitor storage. [Space storage](https://huggingface.co/docs/hub/spaces-storage).
+Space container storage can disappear on restart. This deployment keeps game records and generated files in the durable primary application, so a Space restart does not erase published games. Gateway admission counters are transient and reset on restart. [Space storage](https://huggingface.co/docs/hub/spaces-storage).
 
 A static Space can embed an externally hosted application or serve its public frontend. Static files cannot safely keep an inference credential. All generation requests must still reach a server that enforces authentication, request limits and storage rules. [Static Spaces](https://huggingface.co/docs/hub/spaces-sdks-static).
+
+## Quotas and edge identity
+
+The primary backend uses `ARCADE_DAILY_CAP`, default 100, to enforce a durable global limit on accepted build jobs in a rolling 24-hour window. `ARCADE_PER_HOUR`, default three, limits individual clients. The Space adds process-local limits of three forwarded requests per client per hour and thirty total per rolling day. These additional gateway counters reset on a Space restart.
+
+The Space sends a pseudonymous client hash rather than a raw address. It signs three headers with `ARCADE_EDGE_SECRET`:
+
+- `X-Arcade-Edge-Timestamp`: decimal Unix seconds.
+- `X-Arcade-Edge-Client`: a 64-character lowercase hexadecimal client pseudonym.
+- `X-Arcade-Edge-Signature`: hexadecimal HMAC-SHA256 of the timestamp, a newline and the client pseudonym.
+
+The primary backend requires the complete valid header set and accepts only a 60-second timestamp window. Forged, partial or expired edge identities fail closed. The gateway validates a browser's write origin before forwarding a canonical application origin, forwards only the ownership cookie and approved headers, and returns generic upstream failures. It rewrites the application base path, local redirects and ownership-cookie path for the Space origin.
 
 For an application mounted below a domain root, set `ARCADE_ROOT_PATH` to its public prefix and `ARCADE_PUBLIC_ORIGIN` to the scheme and host. Configure the proxy path rewrite consistently. Allow only the intended Hugging Face parent origins in `ARCADE_FRAME_ANCESTORS`. Embedded job polling also needs a cookie policy compatible with that deployment; cross-site cookies require HTTPS and can be restricted by the visitor's browser. Verify the complete create-and-poll flow in the actual embedded Space.
 

@@ -4,7 +4,7 @@ Arcade can produce a useful record of how a coding model builds and repairs smal
 
 ## Release scope
 
-Publish alphaBell-authored briefs and their generated results as a curated research dataset. Public visitor games are a separate product feature. A public share link is not blanket consent to include someone's prompt or game in a training dataset.
+The [Flint Arcade Trajectories collection](https://huggingface.co/datasets/alphabell/Flint-Arcade-Trajectories) contains alphaBell-authored briefs and actual generation results, including accepted and failed candidates, measured browser feedback and generation budgets. Public visitor games are a separate product feature. A public share link is not blanket consent to include someone's prompt or game in a training dataset.
 
 Visitor contributions require an explicit contribution action, clear applicable terms and a privacy review before inclusion. Keep visitor prompts out of research exports unless that process is implemented. Remove secrets, personal information, third-party credentials and content without suitable redistribution rights. Never include access logs, IP addresses, session identifiers or server diagnostics.
 
@@ -16,6 +16,7 @@ Each record should identify:
 - The brief, creation source and applicable contribution license.
 - The source model, immutable model revision and quantization artifact hash.
 - Generation settings and the system instruction version.
+- The tested starter revision for a new game, or the parent code hash for a remix.
 - Every generated candidate, its SHA256 and attempt index.
 - Structured validator observations for that attempt.
 - The repair feedback and resulting replacement candidate.

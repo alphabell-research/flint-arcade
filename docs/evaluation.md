@@ -2,12 +2,16 @@
 
 Flint Arcade pairs generation with an executable browser check. A game that loads without an exception can still have unclear controls, a broken objective or an unwinnable level. Browser smoke tests are evidence about the actions they execute.
 
+New-game generation includes a tested alphaBell starter for input, state and rendering. Flint adapts that context into a complete standalone document. Remix generation instead includes the actual parent game. Report this foundation-assisted setup alongside the model and harness; it is part of the method.
+
 ## A reproducible comparison
 
 Use the same stock Flint Q8_0 checkpoint, runtime, prompts, sampling settings and token budget for both conditions:
 
 1. **First attempt:** the initial generated game.
 2. **With repair:** the same attempt after a bounded number of feedback-and-repair rounds.
+
+Keep the same starter revision in both conditions. Separate runs made before a starter or prompt change into a different cohort. A comparison that changes the foundation as well as enabling repair does not isolate the repair effect. The pipeline requires the inference server's selected model metadata to report `Q8_0` before every build.
 
 Keep every sampled attempt, including timeouts, rejected code, truncated generations and exhausted repairs. Record the model repository and immutable revision, GGUF filename and SHA256, inference-runtime revision, context length, decoding parameters, generation tokens, latency and validator version. Record the exact brief and any parent game used for a remix.
 

@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import hashlib
 import html as html_escape
 import hmac
+from html.parser import HTMLParser
 import ipaddress
 import logging
 import os
@@ -12,7 +13,7 @@ import re
 import secrets
 import time
 from typing import Annotated
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
@@ -26,6 +27,8 @@ log = logging.getLogger("arcade")
 COOKIE = "arcade_owner"
 GAME_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src 'none'; connect-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'self'; sandbox allow-scripts"
 SITE_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+PUBLIC_HTML_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; worker-src 'none'; frame-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+PUBLIC_HTML_CSP_META = '<meta http-equiv="Content-Security-Policy" content="' + PUBLIC_HTML_CSP + '">'
 PUBLIC_JOB_FIELDS = ("id", "status", "stage", "message", "game_id", "error")
 PUBLIC_GAME_FIELDS = ("id", "title", "description", "created_at", "parent_id", "model_label")
 
@@ -35,6 +38,99 @@ class BuildRequest(BaseModel):
     prompt: Annotated[str, Field(min_length=1, max_length=1800)]
     dataset_opt_in: bool = False
     parent_id: Annotated[str | None, Field(max_length=80, pattern=r"^[A-Za-z0-9_-]+$")] = None
+
+
+class _LeadingHead(HTMLParser):
+    """Find a normal document head before any potentially executable content."""
+    def __init__(self, document):
+        super().__init__()
+        self.insertion_offset = None
+        self.unsafe_prefix = False
+        self.lines = document.splitlines(keepends=True)
+        self.feed(document)
+
+    def handle_starttag(self, tag, attrs):
+        if self.insertion_offset is not None:
+            return
+        if tag == "head" and not self.unsafe_prefix:
+            line, column = self.getpos()
+            self.insertion_offset = sum(len(value) for value in self.lines[:line - 1]) + column + len(self.get_starttag_text())
+        elif tag != "html":
+            self.unsafe_prefix = True
+
+    def handle_data(self, data):
+        if self.insertion_offset is None and data.strip():
+            self.unsafe_prefix = True
+
+
+def prepare_public_html(document):
+    """Add the same standalone network policy to every public game document.
+
+    The original candidate and its provenance hashes remain unchanged in storage.
+    """
+    offset = _LeadingHead(document).insertion_offset
+    if offset is None:
+        doctype = re.match(r"\A\ufeff?\s*<!doctype\b[^>]*>", document, flags=re.I)
+        offset = doctype.end() if doctype else 0
+    marker = "\n" + PUBLIC_HTML_CSP_META + "\n"
+    if document[offset:].startswith(marker):
+        return document
+    return document[:offset] + marker + document[offset:]
+
+
+class _HeadTag(HTMLParser):
+    def __init__(self, document):
+        super().__init__()
+        self.attributes = {}
+        self.feed(document)
+
+    def handle_starttag(self, tag, attrs):
+        self.attributes = {key.lower(): value or "" for key, value in attrs}
+
+
+def _game_share_metadata(content, game, settings, has_preview):
+    """Render crawler-readable share cards from public fields and cached images."""
+    title = re.sub(r"\s+", " ", str(game["title"])).strip() or "Your game"
+    description = re.sub(r"\s+", " ", str(game["description"])).strip() or "Play and remix this game in alphaBell Flint Arcade."
+    page_title = title + " · Flint Arcade"
+    metadata = {
+        "description": description,
+        "og:title": page_title,
+        "og:description": description,
+        "og:type": "website",
+        "og:site_name": "Flint Arcade by alphaBell",
+        "twitter:title": page_title,
+        "twitter:description": description,
+        "twitter:card": "summary",
+    }
+    canonical = None
+    origin = urlsplit(settings.public_origin)
+    if origin.scheme == "https" and origin.hostname and origin.username is None and origin.password is None:
+        public_base = "https://" + origin.netloc + settings.root_path
+        canonical = public_base + "/g/" + quote(game["id"], safe="")
+        metadata["og:url"] = canonical
+        if has_preview:
+            image = public_base + "/preview/" + quote(game["id"], safe="") + ".png"
+            metadata.update({"og:image": image, "og:image:type": "image/png", "og:image:alt": title + " game screenshot", "twitter:image": image, "twitter:image:alt": title + " game screenshot", "twitter:card": "summary_large_image"})
+    # Remove the static card before inserting game-specific tags, avoiding
+    # ambiguous duplicate metadata for crawlers. Keep unrelated head elements.
+    replaced_keys = {"description", "og:title", "og:description", "og:type", "og:site_name", "og:url", "og:image", "og:image:type", "og:image:alt", "og:image:width", "og:image:height", "twitter:title", "twitter:description", "twitter:card", "twitter:image", "twitter:image:alt"}
+    def retain_meta(match):
+        attrs = _HeadTag(match.group(0)).attributes
+        name = attrs.get("name", attrs.get("property", "")).lower()
+        return "" if name in replaced_keys else match.group(0)
+    tag_body = r'''(?:[^>"']|"[^"]*"|'[^']*')*'''
+    content = re.sub(r"<meta\b" + tag_body + r">", retain_meta, content, flags=re.I)
+    content = re.sub(r"<link\b" + tag_body + r">", lambda match: "" if "canonical" in _HeadTag(match.group(0)).attributes.get("rel", "").lower().split() else match.group(0), content, flags=re.I)
+    content = re.sub(r"<title\b[^>]*>[\s\S]*?</title\s*>", "", content, flags=re.I)
+    escaped = html_escape.escape
+    tags = ["<title>" + escaped(page_title) + "</title>"]
+    for name, value in metadata.items():
+        attribute = "property" if name.startswith("og:") else "name"
+        tags.append(f'<meta {attribute}="{name}" content="{escaped(value, quote=True)}">')
+    if canonical:
+        tags.append(f'<link rel="canonical" href="{escaped(canonical, quote=True)}">')
+    return re.sub(r"</head\s*>", lambda match: "\n" + "\n".join(tags) + "\n" + match.group(0), content, count=1, flags=re.I)
 
 
 def _key(data_dir: Path):
@@ -213,7 +309,7 @@ def create_app(settings=None, generator=None):
     @app.get("/api/games/{game_id}")
     async def game(game_id: str):
         item = await get_game(game_id)
-        return {"game": public_game(item), "html": item["html"]}
+        return {"game": public_game(item), "html": prepare_public_html(item["html"])}
 
     @app.post("/api/jobs", status_code=202)
     async def enqueue(body: BuildRequest, request: Request):
@@ -245,13 +341,13 @@ def create_app(settings=None, generator=None):
     @app.get("/play/{game_id}")
     async def play(game_id: str):
         item = await get_game(game_id)
-        return HTMLResponse(item["html"], headers={"Content-Security-Policy": GAME_CSP.replace("frame-ancestors 'self'", "frame-ancestors " + settings.frame_ancestors), "Cache-Control": "public, max-age=300"})
+        return HTMLResponse(prepare_public_html(item["html"]), headers={"Content-Security-Policy": GAME_CSP.replace("frame-ancestors 'self'", "frame-ancestors " + settings.frame_ancestors), "Cache-Control": "public, max-age=300"})
 
     @app.get("/download/{game_id}")
     async def download(game_id: str):
         item = await get_game(game_id)
         filename = re.sub(r"[^a-z0-9]+", "-", item["title"].lower()).strip("-")[:60] or "arcade-game"
-        return Response(item["html"], media_type="text/html", headers={"Content-Disposition": f'attachment; filename="{filename}.html"', "Content-Security-Policy": GAME_CSP.replace("frame-ancestors 'self'", "frame-ancestors " + settings.frame_ancestors)})
+        return Response(prepare_public_html(item["html"]), media_type="text/html", headers={"Content-Disposition": f'attachment; filename="{filename}.html"', "Content-Security-Policy": GAME_CSP.replace("frame-ancestors 'self'", "frame-ancestors " + settings.frame_ancestors)})
 
     @app.get("/preview/{game_id}.png")
     async def preview(game_id: str):
@@ -264,12 +360,14 @@ def create_app(settings=None, generator=None):
     @app.get("/")
     @app.get("/g/{game_id}")
     async def home(game_id: str | None = None):
-        if game_id:
-            await get_game(game_id)
+        item = await get_game(game_id) if game_id else None
         index = settings.web_dir / "index.html"
         if not index.is_file():
             raise HTTPException(503, "The arcade is being prepared.")
         content = index.read_text(encoding="utf-8")
+        if item:
+            has_preview = await run_in_threadpool(storage.preview_path, game_id)
+            content = _game_share_metadata(content, item, settings, has_preview is not None)
         prefix = settings.root_path + "/"
         if "<base " not in content.lower():
             content = re.sub(r"<head([^>]*)>", lambda match: match.group(0) + f'<base href="{html_escape.escape(prefix, quote=True)}">', content, count=1, flags=re.I)

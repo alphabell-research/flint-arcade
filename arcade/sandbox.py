@@ -91,7 +91,9 @@ def sandbox_command(input_path: Path, output_dir: Path, chromium: str):
     venv = Path(sys.prefix).resolve()
     if venv == Path(sys.base_prefix).resolve():
         raise GameRejected("The browser checker requires an isolated Python environment")
-    command = [bwrap, "--unshare-all", "--die-with-parent", "--new-session", "--uid", "0", "--gid", "0", "--clearenv"]
+    # check_game starts Bubblewrap with an explicit minimal environment. Avoid
+    # --clearenv, which older supported distro versions do not implement.
+    command = [bwrap, "--unshare-all", "--die-with-parent", "--new-session", "--uid", "0", "--gid", "0"]
     for path in ("/usr", "/lib", "/lib64"):
         if Path(path).exists():
             command += ["--ro-bind", path, path]
@@ -163,3 +165,33 @@ async def check_game(document, directory, settings):
     if not isinstance(result, dict) or not isinstance(result.get("accepted"), bool):
         raise GameRejected("The isolated browser checker returned invalid results")
     return result
+
+
+async def isolation_preflight(directory, settings):
+    """Verify OS isolation setup before spending any model inference tokens."""
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    output = directory / "output"
+    output.mkdir(mode=0o700, exist_ok=True)
+    command = sandbox_command(Path(__file__).with_name("starter.html"), output, settings.chromium)
+    command[-3:] = ["/usr/bin/true"]
+    process = await asyncio.create_subprocess_exec(*command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, start_new_session=True, preexec_fn=_limits, env={"PATH": "/usr/bin:/bin"})
+    readers = [asyncio.create_task(_bounded_output(stream, 2000)) for stream in (process.stdout, process.stderr)]
+    try:
+        await asyncio.wait_for(process.wait(), timeout=5)
+        stdout, stderr = await asyncio.gather(*readers)
+    except (asyncio.TimeoutError, asyncio.CancelledError):
+        if process.returncode is None:
+            process.kill()
+        await process.wait()
+        raise
+    finally:
+        for reader in readers:
+            if not reader.done():
+                reader.cancel()
+        await asyncio.gather(*readers, return_exceptions=True)
+    (directory / "isolation-log.txt").write_bytes((stdout + b"\n" + stderr)[-4000:])
+    if process.returncode != 0:
+        raise RuntimeError("The isolated game checker is unavailable; no model generation was attempted")
+    (directory / "result.json").write_text(json.dumps({"ready": True, "scope": "OS user, network, process and mount namespace setup only"}))
+    return True

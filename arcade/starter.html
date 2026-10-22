@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Collect three golden sparks and deliver them home while avoiding the wandering drones.">
+<title>Spark Courier Foundation</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#101b28;color:#edf5ee;font:15px system-ui,sans-serif}
+body{display:flex;justify-content:center;align-items:flex-start;padding:12px}
+main{width:min(960px,calc(100vw - 24px),calc(160dvh - 400px));min-width:280px;display:grid;gap:10px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px}h1{font-size:20px;margin:0;color:#ffd881}
+#hud{font-size:14px;text-align:right}canvas{display:block;width:100%;height:auto;aspect-ratio:8/5;border:1px solid #36535b;border-radius:18px;background:#173136;touch-action:none}
+.toolbar{display:flex;justify-content:center;gap:10px}button{border:0;border-radius:12px;background:#ffd881;color:#172d32;padding:10px 18px;font:700 15px system-ui;cursor:pointer;touch-action:none;user-select:none}
+button:focus-visible{outline:3px solid white;outline-offset:3px}button:disabled{opacity:.6;cursor:default}
+p{margin:0;text-align:center;font-size:13px;line-height:1.4;color:#bbd0cd}
+.pad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,48px);gap:6px;justify-content:center}
+.pad button{padding:0;background:#315c61;color:#fff;font-size:22px}.pad button:active,.pad button.held{background:#578f8a}
+[data-dir="up"]{grid-column:2;grid-row:1}[data-dir="left"]{grid-column:1;grid-row:2}[data-dir="down"]{grid-column:2;grid-row:2}[data-dir="right"]{grid-column:3;grid-row:2}
+@media(max-width:480px){h1{font-size:17px}#hud{font-size:12px}main{gap:8px}}
+</style>
+</head>
+<body>
+<main>
+<header><h1>Spark Courier</h1><div id="hud" aria-live="polite"></div></header>
+<canvas id="board" width="960" height="600" aria-label="Spark Courier game board"></canvas>
+<div class="toolbar"><button id="start">Start</button><button id="restart">Restart</button></div>
+<p id="instructions">Collect all three golden sparks, then reach the glowing home. Avoid drones. Arrows or WASD move. Space starts. R restarts.</p>
+<div class="pad" aria-label="Touch movement controls">
+<button data-dir="up" aria-label="Move up">▲</button><button data-dir="left" aria-label="Move left">◀</button>
+<button data-dir="down" aria-label="Move down">▼</button><button data-dir="right" aria-label="Move right">▶</button>
+</div>
+</main>
+<script>
+'use strict';
+// alphaBell framework foundation. Model-generated games may adapt these mechanics.
+const canvas=document.querySelector('#board'), ctx=canvas.getContext('2d');
+const hud=document.querySelector('#hud'), startButton=document.querySelector('#start');
+const W=960,H=600, SPEED=245, HOME={x:170,y:470};
+const seedPositions=[{x:170,y:130},{x:790,y:130},{x:790,y:430}];
+const enemyBases=[{x:470,y:280},{x:480,y:140},{x:480,y:460}];
+const keyboard={up:false,down:false,left:false,right:false};
+const pointerDirections=new Map();
+let state, lastTime=null;
+function clearInputs(){
+  for(const key of Object.keys(keyboard))keyboard[key]=false;
+  pointerDirections.clear();
+  document.querySelectorAll('.pad button').forEach(button=>button.classList.remove('held'));
+}
+function reset(){
+  clearInputs();
+  state={phase:'ready',score:0,lives:3,bag:0,time:0,invulnerableUntil:0,
+    player:{x:100,y:300,r:13,vx:0,vy:0},
+    seeds:seedPositions.map(point=>({...point,taken:false})),
+    enemies:enemyBases.map((point,index)=>({...point,r:21,phase:index*2}))};
+  lastTime=null;
+  updateHUD();
+}
+function start(){if(state.phase!=='playing'){reset();state.phase='playing';updateHUD();}}
+function updateHUD(){
+  hud.textContent=`Sparks ${state.bag}/3 · Hearts ${state.lives} · Score ${state.score}`;
+  startButton.textContent=state.phase==='won'||state.phase==='lost'?'Play again':'Start';
+  startButton.disabled=state.phase==='playing';
+}
+function update(dt){
+  if(state.phase!=='playing')return;
+  state.time+=dt;
+  const held=new Set(pointerDirections.values());
+  let dx=Number(keyboard.right||held.has('right'))-Number(keyboard.left||held.has('left'));
+  let dy=Number(keyboard.down||held.has('down'))-Number(keyboard.up||held.has('up'));
+  const length=Math.hypot(dx,dy)||1;
+  const player=state.player;
+  player.vx=dx/length*SPEED;player.vy=dy/length*SPEED;
+  player.x=Math.max(20,Math.min(W-20,player.x+player.vx*dt));
+  player.y=Math.max(20,Math.min(H-20,player.y+player.vy*dt));
+  state.seeds.forEach(seed=>{
+    if(!seed.taken&&Math.hypot(player.x-seed.x,player.y-seed.y)<32){seed.taken=true;state.bag++;state.score+=100;}
+  });
+  state.enemies.forEach((enemy,index)=>{
+    const base=enemyBases[index];
+    enemy.x=base.x+Math.sin(state.time*.8+enemy.phase)*62;
+    enemy.y=base.y+Math.cos(state.time*.6+enemy.phase)*34;
+    if(state.time>=state.invulnerableUntil&&Math.hypot(player.x-enemy.x,player.y-enemy.y)<player.r+enemy.r){
+      state.lives--;state.invulnerableUntil=state.time+1;
+      if(state.lives<=0)state.phase='lost';
+    }
+  });
+  if(state.phase==='playing'&&state.bag===3&&Math.hypot(player.x-HOME.x,player.y-HOME.y)<38){state.phase='won';state.score+=250;}
+  if(state.phase!=='playing')clearInputs();
+  updateHUD();
+}
+function circle(x,y,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}
+function draw(){
+  const background=ctx.createLinearGradient(0,0,W,H);background.addColorStop(0,'#173a42');background.addColorStop(1,'#10252f');
+  ctx.fillStyle=background;ctx.fillRect(0,0,W,H);
+  for(let index=0;index<50;index++)circle((index*179+40)%W,(index*83+30)%H,1+index%3,'#2d5961');
+  ctx.strokeStyle='#294e55';ctx.lineWidth=2;
+  for(let x=40;x<W;x+=80){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=40;y<H;y+=80){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  circle(HOME.x,HOME.y,47,'#244e47');circle(HOME.x,HOME.y,36,'#649e76');
+  ctx.fillStyle='#d8edb5';ctx.fillRect(HOME.x-18,HOME.y-12,36,30);
+  ctx.fillStyle='#ffd881';ctx.beginPath();ctx.moveTo(HOME.x-27,HOME.y-12);ctx.lineTo(HOME.x,HOME.y-36);ctx.lineTo(HOME.x+27,HOME.y-12);ctx.fill();
+  ctx.fillStyle='#153e42';ctx.fillRect(HOME.x-5,HOME.y+3,10,15);
+  state.seeds.forEach(seed=>{
+    if(seed.taken)return;
+    circle(seed.x,seed.y,26,'#62573e');circle(seed.x,seed.y,16,'#e9a649');
+    circle(seed.x-4,seed.y-5,8,'#fff0a2');
+  });
+  state.enemies.forEach(enemy=>{
+    circle(enemy.x+3,enemy.y+6,enemy.r,'#15212d');circle(enemy.x,enemy.y,enemy.r,'#ca7180');
+    circle(enemy.x-7,enemy.y-3,4,'#fce7df');circle(enemy.x+7,enemy.y-3,4,'#fce7df');
+    ctx.fillStyle='#6e354d';ctx.fillRect(enemy.x-6,enemy.y+7,12,3);
+  });
+  const player=state.player;
+  if(state.time<state.invulnerableUntil)circle(player.x,player.y,25,'#7fbbb6');
+  circle(player.x+2,player.y+6,17,'#12232d');circle(player.x,player.y,16,'#f1f0d7');
+  circle(player.x,player.y-3,10,'#89cfd0');circle(player.x-3,player.y-5,3,'#d9ffff');
+  if(state.bag>0)circle(player.x+17,player.y+8,7,'#ffd881');
+  if(state.phase!=='playing'){
+    ctx.fillStyle='#10212bdc';ctx.fillRect(180,210,600,180);
+    ctx.textAlign='center';ctx.fillStyle='#ffd881';ctx.font='700 38px system-ui';
+    ctx.fillText(state.phase==='won'?'Delivery complete!':state.phase==='lost'?'The drones caught you':'Spark Courier',W/2,270);
+    ctx.fillStyle='#e0ede8';ctx.font='21px system-ui';
+    ctx.fillText(state.phase==='ready'?'Three sparks. One safe journey home.':'Press Start to play again, or R to restart.',W/2,315);
+    ctx.font='17px system-ui';ctx.fillText('Use the arrows, WASD or the touch pad below.',W/2,350);ctx.textAlign='left';
+  }
+}
+function loop(timestamp){
+  const dt=lastTime===null?0:Math.min((timestamp-lastTime)/1000,.04);
+  lastTime=timestamp;update(dt);draw();requestAnimationFrame(loop);
+}
+const keyDirections={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',w:'up',s:'down',a:'left',d:'right'};
+window.addEventListener('keydown',event=>{
+  const key=event.key.length===1?event.key.toLowerCase():event.key;
+  if(keyDirections[key]){event.preventDefault();keyboard[keyDirections[key]]=true;}
+  if(event.code==='Space'){event.preventDefault();if(state.phase!=='playing'&&!event.repeat)start();}
+  if(key==='r'&&!event.repeat)reset();
+});
+window.addEventListener('keyup',event=>{
+  const key=event.key.length===1?event.key.toLowerCase():event.key;
+  if(keyDirections[key]){event.preventDefault();keyboard[keyDirections[key]]=false;}
+});
+document.querySelectorAll('[data-dir]').forEach(button=>{
+  button.addEventListener('pointerdown',event=>{event.preventDefault();pointerDirections.set(event.pointerId,button.dataset.dir);button.classList.add('held');button.setPointerCapture(event.pointerId);});
+  const release=event=>{pointerDirections.delete(event.pointerId);button.classList.remove('held');};
+  button.addEventListener('pointerup',release);button.addEventListener('pointercancel',release);button.addEventListener('lostpointercapture',release);
+});
+window.addEventListener('blur',clearInputs);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInputs();});
+startButton.addEventListener('click',start);
+document.querySelector('#restart').addEventListener('click',reset);
+canvas.addEventListener('pointerdown',()=>{if(state.phase==='ready')start();});
+window.arcade={restart:reset,snapshot:()=>({phase:state.phase,score:state.score,player:{x:state.player.x,y:state.player.y},lives:state.lives,collected:state.bag})};
+reset();requestAnimationFrame(loop);
+</script>
+</body>
+</html>

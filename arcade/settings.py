@@ -3,16 +3,24 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import os
 import re
+import sys
 
 
 def _bool(name: str, default: bool = False) -> bool:
     return os.environ.get(name, str(default)).lower() in {"true", "1", "yes"}
 
 
+def _web_dir() -> Path:
+    checkout = Path(__file__).resolve().parent.parent / "web"
+    if (checkout / "index.html").is_file():
+        return checkout
+    return Path(sys.prefix) / "share" / "alphabell-arcade" / "web"
+
+
 @dataclass(frozen=True)
 class Settings:
     data_dir: Path = field(default_factory=lambda: Path(os.environ.get("ARCADE_DATA_DIR", str(Path.home() / ".local/share/alphabell-arcade"))))
-    web_dir: Path = field(default_factory=lambda: Path(__file__).resolve().parent.parent / "web")
+    web_dir: Path = field(default_factory=_web_dir)
     generation_enabled: bool = field(default_factory=lambda: _bool("ARCADE_GENERATION_ENABLED"))
     root_path: str = field(default_factory=lambda: os.environ.get("ARCADE_ROOT_PATH", "").rstrip("/"))
     cookie_samesite: str = field(default_factory=lambda: os.environ.get("ARCADE_COOKIE_SAMESITE", "strict"))
@@ -27,8 +35,9 @@ class Settings:
     chromium: str = field(default_factory=lambda: os.environ.get("ARCADE_CHROMIUM", "/usr/lib/chromium/chromium" if Path("/usr/lib/chromium/chromium").is_file() else "/opt/google/chrome/chrome"))
     qa_timeout: float = field(default_factory=lambda: float(os.environ.get("ARCADE_QA_TIMEOUT", "45")))
     inference_timeout: float = field(default_factory=lambda: float(os.environ.get("ARCADE_INFERENCE_TIMEOUT", "180")))
-    completion_tokens: int = field(default_factory=lambda: int(os.environ.get("ARCADE_COMPLETION_TOKENS", "16384")))
-    reasoning_budget: int = field(default_factory=lambda: int(os.environ.get("ARCADE_REASONING_BUDGET", "4096")))
+    constrain_html: bool = field(default_factory=lambda: _bool("ARCADE_CONSTRAIN_HTML", True))
+    completion_tokens: int = field(default_factory=lambda: int(os.environ.get("ARCADE_COMPLETION_TOKENS", "8192")))
+    reasoning_budget: int | None = field(default_factory=lambda: int(os.environ["ARCADE_REASONING_BUDGET"]) if "ARCADE_REASONING_BUDGET" in os.environ else None)
     upstream_revision: str = field(default_factory=lambda: os.environ.get("ARCADE_UPSTREAM_REVISION", ""))
     upstream_model: str = field(default_factory=lambda: os.environ.get("ARCADE_UPSTREAM_MODEL", ""))
     trusted_proxy_hops: int = field(default_factory=lambda: int(os.environ.get("ARCADE_TRUSTED_PROXY_HOPS", "0")))
@@ -44,6 +53,10 @@ class Settings:
     max_html_bytes: int = 1_500_000
 
     def __post_init__(self):
+        if self.reasoning_budget is None:
+            object.__setattr__(self, "reasoning_budget", 0 if self.constrain_html else 4096)
+        if self.completion_tokens < 1 or self.reasoning_budget < 0:
+            raise ValueError("Invalid model token limits")
         if not re.fullmatch(r"[A-Za-z0-9:/.*_' -]+", self.frame_ancestors):
             raise ValueError("Invalid frame ancestors")
         if self.root_path and (not self.root_path.startswith("/") or not re.fullmatch(r"/[A-Za-z0-9/_-]+", self.root_path)):

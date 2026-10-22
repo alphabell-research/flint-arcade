@@ -8,6 +8,8 @@ Embed the game in a sandboxed iframe that permits scripts but does not permit sa
 
 Serve game HTML with an HTTP content-security-policy header as well as the iframe sandbox. An HTML download should carry its own restrictive policy near the start of the document. A downloaded game is still code; opening it outside the Arcade player changes the surrounding security boundary.
 
+Playable pages, API HTML and downloads add the same restrictive CSP meta tag. Stored candidate code and provenance hashes retain the original model output.
+
 Render generated metadata with text APIs. Never concatenate a title, prompt or model error into application HTML. Resolve game IDs against a fixed format rather than accepting filesystem paths or remote URLs.
 
 ## Server boundary

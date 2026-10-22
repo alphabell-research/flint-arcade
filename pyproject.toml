@@ -7,14 +7,21 @@ name = "alphabell-flint-arcade"
 version = "0.1.0"
 description = "Build, play and remix browser games with alphaBell Flint Arcade"
 requires-python = ">=3.11"
-dependencies = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.34,<1", "httpx>=0.28,<1"]
+dependencies = ["fastapi==0.159.1", "uvicorn[standard]==0.54.0", "httpx==0.28.1"]
 
 [project.optional-dependencies]
 test = ["pytest>=8,<10"]
-sandbox = ["playwright>=1.50,<2"]
+sandbox = ["playwright==1.64.0"]
 
 [tool.setuptools.packages.find]
 include = ["arcade*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.setuptools.package-data]
+arcade = ["starter.html"]
+
+[tool.setuptools.data-files]
+"share/alphabell-arcade/web" = ["web/index.html", "web/app.js", "web/styles.css", "web/favicon.svg"]
+"share/alphabell-arcade/web/fonts" = ["web/fonts/*.woff2", "web/fonts/*-OFL.txt"]
