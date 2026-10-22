@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flint Arcade · alphaBell</title>
+  <meta name="description" content="Describe a small, strange game. Build it with Flint, play it in your browser, and make it your own.">
+  <meta name="theme-color" content="#f7f5ef">
+  <meta property="og:title" content="Flint Arcade by alphaBell">
+  <meta property="og:description" content="Small games. Strange ideas. Yours to play and remix.">
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="./" data-home aria-label="Flint Arcade home"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Flint <strong>Arcade</strong></span></a>
+    <nav aria-label="Main navigation"><a href="#games" data-gallery>Play</a><a href="#create" data-create>Make a game <span aria-hidden="true">↗</span></a></nav>
+    <a class="lab-link" href="https://alphabell.com" target="_blank" rel="noopener noreferrer">by <strong>alphaBell</strong><span class="sr-only"> (opens a new tab)</span></a>
+  </header>
+
+  <main id="main">
+    <section id="home-view">
+      <div class="hero wrap">
+        <div class="hero-copy"><p class="eyebrow"><span class="spark" aria-hidden="true">✳</span> An open playground by alphaBell</p><h1>Your weird idea.<br>A game you can <em>play.</em></h1><p class="intro">Describe a little world. Flint writes the game.<br>Play it, break it, make it stranger.</p><a class="text-link" href="#games" data-gallery>Find something to play <span aria-hidden="true">↓</span></a></div>
+        <div class="creator" id="create">
+          <div class="creator-top"><span class="eyebrow">What should we make?</span><span class="model-label" id="model-label">Flint 8-bit</span></div>
+          <form id="create-form">
+            <label class="sr-only" for="game-prompt">Describe your game</label>
+            <textarea id="game-prompt" name="prompt" rows="4" minlength="12" maxlength="1800" placeholder="A tiny gardener on a planet where every plant changes gravity…" required></textarea>
+            <div class="creator-bottom"><span class="prompt-hint">Games and briefs are public.<br>Keep private details out.</span><button class="button primary" id="create-button" type="submit">Make my game <span aria-hidden="true">↗</span></button></div>
+            <details class="research-options"><summary>Research sharing</summary><label><input id="create-research" type="checkbox" name="dataset_opt_in"><span>Share this build for research</span></label><p>Let alphaBell include your brief, game and test results in a public research dataset. You can make and share a game without choosing this.</p></details>
+          </form>
+          <div class="examples"><span>Start with a spark</span><div id="prompt-examples"></div></div>
+          <p id="generation-notice" class="availability" hidden></p>
+          <p id="create-error" class="form-error" role="alert" hidden></p>
+        </div>
+      </div>
+
+      <section class="gallery-section wrap" id="games" aria-labelledby="gallery-title">
+        <div class="section-heading"><div><p class="eyebrow">The collection</p><h2 id="gallery-title">Little worlds. Big personality.</h2></div><div class="gallery-tools"><span id="game-count" class="subtle"></span><button id="refresh-gallery" class="icon-button" aria-label="Refresh games" title="Refresh games"><span aria-hidden="true">↻</span></button></div></div>
+        <p id="gallery-status" class="gallery-status" role="status">Opening the arcade…</p>
+        <div id="gallery" class="game-grid" aria-label="Games"></div>
+        <div id="gallery-error" class="empty-state" hidden><p>We couldn't load the games.</p><button class="button secondary" id="retry-gallery">Try again</button></div>
+        <div id="gallery-empty" class="empty-state" hidden><span class="empty-art" aria-hidden="true">✳</span><h3>The first world is yours.</h3><p>Describe a game above to start the collection.</p><button class="button secondary" data-create>Make a game</button></div>
+      </section>
+      <div class="closing-note wrap"><span class="closing-mark" aria-hidden="true">✳</span><p>Good games start with<br><strong>“What if…?”</strong></p><a href="#create" class="text-link" data-create>Try your idea <span aria-hidden="true">↗</span></a></div>
+    </section>
+
+    <section id="studio-view" class="studio wrap" hidden aria-labelledby="studio-title">
+      <a class="back-link" href="./" data-home><span aria-hidden="true">←</span> Back to the arcade</a>
+      <div id="studio-loading" class="studio-loading" role="status">Opening your game…</div>
+      <div id="studio-error" class="empty-state" hidden><h1>This game couldn't open.</h1><p id="studio-error-message">Try again in a moment.</p><button class="button secondary" data-home>Back to the arcade</button></div>
+      <div id="studio-content" hidden>
+        <div class="studio-heading"><div><p class="eyebrow" id="studio-kicker">Made with Flint</p><h1 id="studio-title"></h1><p id="studio-description"></p></div><div class="studio-actions"><button class="button secondary" id="share-button"><span aria-hidden="true">↗</span> Share</button><a class="button secondary" id="download-button" download>Download <span aria-hidden="true">↓</span></a></div></div>
+        <div class="play-shell" id="play-shell"><iframe id="game-frame" title="Playable game" sandbox="allow-scripts allow-pointer-lock" allow="fullscreen" allowfullscreen referrerpolicy="no-referrer"></iframe><div class="play-toolbar"><span><span class="play-dot" aria-hidden="true"></span> Ready to play</span><div><button id="restart-button" class="toolbar-button"><span aria-hidden="true">↻</span> Restart</button><button id="fullscreen-button" class="toolbar-button"><span aria-hidden="true">⤢</span> <span>Fullscreen</span></button></div></div></div>
+        <div class="remix-layout"><div class="remix-heading"><span class="eyebrow">Make it yours</span><h2>One more twist?</h2><p>Change the rules. Add a character.<br>Take this world somewhere new.</p><a id="parent-link" class="text-link" href="#" hidden>Play the original <span aria-hidden="true">↗</span></a></div><div class="remix-box"><form id="remix-form"><label for="remix-prompt">What would you change?</label><textarea id="remix-prompt" name="prompt" rows="3" minlength="8" maxlength="1800" placeholder="Make the floor turn to jelly every ten seconds…" required></textarea><div class="remix-bottom"><span class="subtle">Games and briefs are public.<br>Keep private details out.</span><button id="remix-button" type="submit" class="button primary">Remix game <span aria-hidden="true">↗</span></button></div><details class="research-options"><summary>Research sharing</summary><label><input id="remix-research" type="checkbox" name="dataset_opt_in"><span>Share this build for research</span></label><p>Let alphaBell include your brief, game and test results in a public research dataset. You can make and share a game without choosing this.</p></details></form><p id="remix-notice" class="availability" hidden></p><p id="remix-error" class="form-error" role="alert" hidden></p></div></div>
+        <div class="share-row" id="share-fallback" hidden><label for="share-url">Game link</label><input id="share-url" type="url" readonly><button class="button secondary" id="select-share">Select link</button></div>
+      </div>
+    </section>
+
+    <section id="job-panel" class="job-panel" hidden aria-labelledby="job-title" aria-live="polite">
+      <div class="job-visual" aria-hidden="true"><span></span><span></span><span></span><span></span></div><div class="job-content"><span class="eyebrow" id="job-stage">In the queue</span><h2 id="job-title">A little world is on its way.</h2><p id="job-message">You can explore the arcade while Flint works.</p><ol class="job-steps" aria-label="Game progress"><li data-step="queued">Idea</li><li data-step="generating">Build</li><li data-step="testing">Playtest</li><li data-step="complete">Play</li></ol><button id="job-retry" class="button secondary" hidden>Try again</button><button id="job-open" class="button primary" hidden>Play your game <span aria-hidden="true">↗</span></button></div><button class="icon-button job-close" id="job-close" aria-label="Dismiss progress" hidden>×</button>
+    </section>
+  </main>
+
+  <footer class="site-footer wrap"><a class="footer-brand" href="https://alphabell.com" target="_blank" rel="noopener noreferrer">alphaBell <span aria-hidden="true">↗</span></a><p>Small games. Strange ideas. Yours to remix.</p><div><a id="source-link" href="https://github.com/alphabell-research" target="_blank" rel="noopener noreferrer">Source <span aria-hidden="true">↗</span></a><a id="hf-link" href="https://huggingface.co/alphabell" target="_blank" rel="noopener noreferrer">Hugging Face <span aria-hidden="true">↗</span></a></div></footer>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>
