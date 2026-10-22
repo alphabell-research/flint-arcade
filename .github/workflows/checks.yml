@@ -14,8 +14,17 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install isolation prerequisite
-        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          sudo mkdir -p /usr/lib/chromium
+          sudo ln -sf /opt/google/chrome/chrome /usr/lib/chromium/chromium
       - name: Install application and test dependencies
-        run: pip install -e '.[test,sandbox]'
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -e '.[test,sandbox]'
       - name: Check application, gateway and packaging contracts
-        run: pytest -q
+        run: .venv/bin/pytest -q

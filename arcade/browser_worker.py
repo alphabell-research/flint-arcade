@@ -68,6 +68,26 @@ def state_progress(before, after):
     return previous != current
 
 
+def touch_control_groups(page):
+    groups = {"horizontal": [], "vertical": []}
+    buttons = page.locator("button:visible")
+    for index in range(min(buttons.count(), 16)):
+        button = buttons.nth(index)
+        identifier = re.sub(r"([a-z])([A-Z])", r"\1 \2", button.get_attribute("id") or "").replace("_", " ").replace("-", " ")
+        metadata = " ".join(filter(None, [button.get_attribute("aria-label"), button.get_attribute("data-dir"), button.get_attribute("data-action"), button.get_attribute("data-direction"), identifier])).lower()
+        text = button.inner_text().strip().lower()
+        label = metadata.strip() or text
+        if re.search(r"\b(?:left|right)\b", metadata):
+            groups["horizontal"].append((button, label))
+        elif re.search(r"\b(?:up|down|jump)\b", metadata):
+            groups["vertical"].append((button, label))
+        elif re.search(r"\b(?:left|right)\b|[\u25c0\u25c4\u2190\u25b6\u25ba\u2192]", text):
+            groups["horizontal"].append((button, text))
+        elif re.search(r"\b(?:up|down|jump)\b|[\u25b2\u25bc\u2191\u2193]", text):
+            groups["vertical"].append((button, text))
+    return groups
+
+
 def held_touch(page, session, target):
     box = target.bounding_box()
     if not box:
@@ -129,22 +149,23 @@ def exercise(browser, mobile=False):
     started = snapshot(page)
     measurements, touch_axes, control_errors = [], {}, []
     if mobile:
-        buttons = page.locator("button:visible")
-        groups = {"horizontal": [], "vertical": []}
-        for index in range(min(buttons.count(), 16)):
-            button = buttons.nth(index)
-            label = (button.get_attribute("aria-label") or button.inner_text()).strip().lower()
-            if re.search(r"\b(?:left|right)\b|[\u25c0\u25c4\u2190\u25b6\u25ba\u2192]", label):
-                groups["horizontal"].append((button, label))
-            elif re.search(r"\b(?:up|down|jump)\b|[\u25b2\u25bc\u2191\u2193]", label):
-                groups["vertical"].append((button, label))
+        # Some games reveal the touch pad on the next UI frame or short timer.
+        # Give that transition a bounded opportunity before selecting controls.
+        groups = touch_control_groups(page)
+        for _ in range(10):
+            if any(groups.values()):
+                break
+            page.wait_for_timeout(50)
+            snapshot(page)
+            groups = touch_control_groups(page)
         session = context.new_cdp_session(page)
         if not any(groups.values()):
             groups = {"canvas": [(page.locator("canvas").first, "canvas touch hold")]}
         for group, targets in groups.items():
             if not targets:
                 continue
-            touch_axes[group] = False
+            outcomes = []
+            failed = []
             for target, label in targets[:3]:
                 prior = snapshot(page)
                 if prior["phase"] != "playing":
@@ -153,11 +174,23 @@ def exercise(browser, mobile=False):
                 current = snapshot(page)
                 progress = applied and state_progress(prior, current)
                 measurements.append({"input": label, "group": group, "before": prior, "after": current, "progress": progress})
-                touch_axes[group] = touch_axes[group] or progress
-                if progress:
-                    break
-            if not touch_axes[group]:
-                control_errors.append(group + " touch controls did not produce movement, score or game-state progress after Start")
+                outcomes.append(progress)
+                if not progress:
+                    failed.append((len(outcomes)-1, target, label))
+            # A directional control can legitimately begin against a wall.
+            # Retry it after the opposite control has had a chance to move away.
+            for index, target, label in failed:
+                prior = snapshot(page)
+                if prior["phase"] != "playing":
+                    continue
+                applied = held_touch(page, session, target)
+                current = snapshot(page)
+                progress = applied and state_progress(prior, current)
+                measurements.append({"input": label, "group": group, "retry": True, "before": prior, "after": current, "progress": progress})
+                outcomes[index] = progress
+                if not progress:
+                    control_errors.append(label + " touch control did not produce movement, score or game-state progress after Start")
+            touch_axes[group] = bool(outcomes) and all(outcomes)
     else:
         for key in ("ArrowRight", "ArrowUp", "d", "w"):
             prior = snapshot(page)

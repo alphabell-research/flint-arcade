@@ -339,3 +339,31 @@ def test_actual_isolation_preflight_uses_clean_environment(tmp_path,monkeypatch)
     assert kwargs["env"]=={"PATH":"/usr/bin:/bin"}
     assert "--unshare-all" in args and "/app/browser_worker.py" in args
     assert json.loads((tmp_path/"preflight/result.json").read_text())["ready"] is True
+
+
+def test_delayed_touch_controls_and_semantic_ids_are_measured(tmp_path):
+    if not shutil.which("bwrap") or not Path("/usr/lib/chromium/chromium").exists():
+        pytest.skip("Bubblewrap and system Chromium required")
+    document=Path(generation.__file__).with_name("starter.html").read_text()
+    document=document.replace('<div class="pad" aria-label="Touch movement controls">','<div class="pad" style="display:none" aria-label="Touch movement controls">')
+    document=document.replace("state.phase='playing';updateHUD();", "state.phase='playing';updateHUD();setTimeout(()=>document.querySelector('.pad').style.display='grid',100);")
+    for direction in ("up","down","left","right"):
+        document=document.replace('data-dir="'+direction+'" aria-label="Move '+direction+'"','id="'+direction+'Btn"')
+    document=document.replace("document.querySelectorAll('[data-dir]')", "document.querySelectorAll('.pad button')")
+    document=document.replace("button.dataset.dir", "button.id.replace('Btn','').toLowerCase()")
+    document=document.replace('>\u25c0</button>','>\u25bc</button>')
+    result=asyncio.run(check_game(document,tmp_path/"delayed-touch",config(tmp_path)))
+    assert result["accepted"],result
+    mobile=result["checks"][1]
+    assert mobile["touch_axes"]=={"horizontal":True,"vertical":True}
+    assert any("left" in item["input"] and item["progress"] for item in mobile["input_measurements"])
+
+
+def test_one_broken_direction_is_not_hidden_by_other_working_controls(tmp_path):
+    if not shutil.which("bwrap") or not Path("/usr/lib/chromium/chromium").exists():
+        pytest.skip("Bubblewrap and system Chromium required")
+    document=Path(generation.__file__).with_name("starter.html").read_text()
+    document=document.replace("pointerDirections.set(event.pointerId,button.dataset.dir);", "if(button.dataset.dir!=='down')pointerDirections.set(event.pointerId,button.dataset.dir);")
+    result=asyncio.run(check_game(document,tmp_path/"broken-down",config(tmp_path)))
+    assert not result["accepted"]
+    assert any("down" in error and "touch control" in error for error in result["errors"])

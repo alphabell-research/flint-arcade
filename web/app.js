@@ -302,7 +302,7 @@
   $('remix-form').addEventListener('submit', event => submitGame(event, true));
   $('refresh-gallery').addEventListener('click', loadGames);
   $('retry-gallery').addEventListener('click', loadGames);
-  $('restart-button').addEventListener('click', () => { if (!state.game) return; loadFrame(path(`play/${encodeURIComponent(state.game.id || routeGameId())}`) + `?restart=${Date.now()}`, true); });
+  $('restart-button').addEventListener('click', () => { if (!state.game) return; loadFrame(path(`play/${encodeURIComponent(state.game.id || routeGameId())}`), true); });
   $('fullscreen-button').addEventListener('click', async () => {
     try { if (document.fullscreenElement) await document.exitFullscreen(); else if ($('play-shell').requestFullscreen) { await $('play-shell').requestFullscreen(); $('game-frame').focus(); } else toast('Use your browser’s fullscreen control to expand the game.'); }
     catch (_) { toast('Fullscreen isn’t available here. The game is still ready to play.'); }

@@ -1,0 +1,33 @@
+[Unit]
+Description=alphaBell Flint Arcade
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=alphabell-arcade
+Group=alphabell-arcade
+WorkingDirectory=/opt/alphabell-arcade/app
+EnvironmentFile=/etc/alphabell-arcade/service.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/alphabell-arcade/venv/bin/python -m uvicorn arcade.app:create_app --factory --host 127.0.0.1 --port 8788 --workers 1 --no-access-log --no-proxy-headers
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths=/var/lib/alphabell-arcade
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+MemoryMax=2G
+TasksMax=192
+CPUQuota=150%
+
+[Install]
+WantedBy=multi-user.target
