@@ -119,9 +119,14 @@ function draw(){
   if(state.phase!=='playing'){
     ctx.fillStyle='#10212bdc';ctx.fillRect(180,210,600,180);
     ctx.textAlign='center';ctx.fillStyle='#ffd881';ctx.font='700 38px system-ui';
-    ctx.fillText(state.phase==='won'?'Delivery complete!':state.phase==='lost'?'The drones caught you':'Spark Courier',W/2,270);
+    let heading='Spark Courier';
+    if(state.phase==='won')heading='Delivery complete!';
+    if(state.phase==='lost')heading='The drones caught you';
+    ctx.fillText(heading,W/2,270);
     ctx.fillStyle='#e0ede8';ctx.font='21px system-ui';
-    ctx.fillText(state.phase==='ready'?'Three sparks. One safe journey home.':'Press Start to play again, or R to restart.',W/2,315);
+    let message='Three sparks. One safe journey home.';
+    if(state.phase!=='ready')message='Press Start to play again, or R to restart.';
+    ctx.fillText(message,W/2,315);
     ctx.font='17px system-ui';ctx.fillText('Use the arrows, WASD or the touch pad below.',W/2,350);ctx.textAlign='left';
   }
 }

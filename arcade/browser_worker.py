@@ -105,9 +105,16 @@ def held_touch(page, session, target):
 
 
 def exercise(browser, mobile=False):
-    errors, requests = [], []
+    errors, requests, locations = [], [], []
     context = browser.new_context(viewport={"width": 390 if mobile else 1100, "height": 844 if mobile else 800}, is_mobile=mobile, has_touch=mobile, service_workers="block", accept_downloads=False)
     page = context.new_page()
+    diagnostics = context.new_cdp_session(page)
+    diagnostics.send("Runtime.enable")
+    def exception_location(event):
+        detail = event.get("exceptionDetails", {})
+        if detail.get("url") == URL and isinstance(detail.get("lineNumber"), int):
+            locations.append(f"{URL}:{detail['lineNumber'] + 1}:{detail.get('columnNumber', 0) + 1}")
+    diagnostics.on("Runtime.exceptionThrown", exception_location)
     page.on("pageerror", lambda error: errors.append(browser_error(error)))
     page.on("dialog", lambda dialog: dialog.dismiss())
     def route(request):
@@ -120,7 +127,7 @@ def exercise(browser, mobile=False):
     page.goto(URL, wait_until="load", timeout=10_000)
     page.wait_for_timeout(250)
     if errors:
-        raise RuntimeError("Game startup JavaScript errors: " + " | ".join(dict.fromkeys(errors[:4]))[:1000])
+        raise RuntimeError("Game startup JavaScript errors: " + " | ".join(dict.fromkeys(errors[:4] + locations[:4]))[:1000])
     try:
         before = snapshot(page)
     except Exception as exc:

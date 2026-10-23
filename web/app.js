@@ -30,7 +30,7 @@
       let data;
       try { data = await response.json(); } catch (_) { data = {}; }
       if (!response.ok) {
-        const error = new Error(response.status === 429 ? 'The arcade is busy. Give it a moment, then try again.' : response.status === 503 ? 'Flint is taking a break. You can still play the collection.' : response.status === 404 ? 'This game is no longer available.' : 'We couldn’t finish that request. Please try again.');
+        const error = new Error(response.status === 429 ? 'The build limit has been reached. Please try again later.' : response.status === 503 ? 'Flint is taking a break. You can still play the collection.' : response.status === 404 ? 'This game is no longer available.' : 'We couldn’t finish that request. Please try again.');
         error.status = response.status;
         throw error;
       }
@@ -227,7 +227,7 @@
     const [stage, title, message] = copy[status] || copy.generating;
     $('job-stage').textContent = stage;
     $('job-title').textContent = title;
-    $('job-message').textContent = message;
+    $('job-message').textContent = status === 'failed' && job.error ? job.error : message;
     const current = status === 'queued' ? 0 : status === 'generating' ? 1 : ['testing', 'repairing'].includes(status) ? 2 : status === 'complete' ? 4 : -1;
     document.querySelectorAll('.job-steps li').forEach((li, index) => { li.classList.toggle('done', index < current); li.classList.toggle('active', index === current); if (index === current) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current'); });
     show('job-open', status === 'complete' && Boolean(job.game_id));
