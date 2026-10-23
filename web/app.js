@@ -227,7 +227,7 @@
     const [stage, title, message] = copy[status] || copy.generating;
     $('job-stage').textContent = stage;
     $('job-title').textContent = title;
-    $('job-message').textContent = message;
+    $('job-message').textContent = status === 'failed' && job.error ? job.error : message;
     const current = status === 'queued' ? 0 : status === 'generating' ? 1 : ['testing', 'repairing'].includes(status) ? 2 : status === 'complete' ? 4 : -1;
     document.querySelectorAll('.job-steps li').forEach((li, index) => { li.classList.toggle('done', index < current); li.classList.toggle('active', index === current); if (index === current) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current'); });
     show('job-open', status === 'complete' && Boolean(job.game_id));
