@@ -118,17 +118,21 @@ def apply_edits(document, content, max_bytes=1_500_000):
         raise GameRejected("Return between one and 32 source edits")
     lines = document.splitlines(keepends=True)
     replacements = {}
+    seen = set()
     for edit in value["edits"]:
         if not isinstance(edit, dict) or set(edit) != {"line", "replace"} or type(edit["line"]) is not int or not isinstance(edit["replace"], str):
             raise GameRejected("Every edit requires an integer line and a replacement string")
         number, replacement = edit["line"], edit["replace"]
-        if not 1 <= number <= len(lines) or number in replacements:
+        if not 1 <= number <= len(lines) or number in seen:
             raise GameRejected("Each source line number must be valid and edited only once")
+        seen.add(number)
         original = lines[number - 1]
         if original.rstrip("\r\n") == replacement.rstrip("\r\n"):
-            raise GameRejected("Every source edit must make a real change")
+            continue
         ending = "\r\n" if original.endswith("\r\n") else "\n" if original.endswith("\n") else ""
         replacements[number] = replacement.rstrip("\r\n") + ending
+    if not replacements:
+        raise GameRejected("The repair must include at least one real source change")
     result = "".join(replacements.get(number, line) for number, line in enumerate(lines, 1))
     if len(result.encode()) > max_bytes:
         raise GameRejected("Repaired game document exceeds its size limit")

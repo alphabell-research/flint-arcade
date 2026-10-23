@@ -64,6 +64,10 @@ def test_line_edits_preserve_endings_and_allow_removing_a_line():
     assert generation.apply_edits('one\ntwo',edits((2,''))) == 'one\n'
 
 
+def test_unchanged_line_does_not_discard_a_valid_fix():
+    assert generation.apply_edits('broken\ncorrect',edits((1,'fixed'),(2,'correct'))) == 'fixed\ncorrect'
+
+
 def test_invalid_patch_preserves_browser_feedback_and_current_source(monkeypatch,tmp_path):
     source='<!doctype html><html><head><title>Broken</title></head>\n<body><canvas></canvas><script>window.arcade={}</script></body></html>'
     calls=[]

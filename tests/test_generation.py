@@ -162,6 +162,7 @@ def test_actual_browser_reports_startup_syntax_error(tmp_path):
     assert result["accepted"] is False
     errors = " ".join(result["errors"])
     assert "JavaScript" in errors and "Unexpected token" in errors
+    assert "file:///input/game.html:" in errors
     assert "Provide window.arcade" not in errors
 
 
