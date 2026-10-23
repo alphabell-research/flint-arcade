@@ -100,11 +100,13 @@ def test_global_daily_limit_survives_failed_jobs_and_restart(settings):
         replace(settings, daily_cap=0)
 
 
-def test_verified_preview_is_public_and_private_paths_are_not(settings):
+@pytest.mark.parametrize('attempt_count',[1,5])
+def test_verified_preview_is_public_and_private_paths_are_not(settings,attempt_count):
     app = create_app(replace(settings, root_path="/arcade", frame_ancestors="'self' https://huggingface.co https://*.hf.space"))
     store = app.state.storage
     result = accepted()
-    source = settings.data_dir / "builds/trusted-run/1/qa/desktop.png"
+    result['provenance']['attempts']=[{} for _ in range(attempt_count)]
+    source = settings.data_dir / f"builds/trusted-run/{attempt_count}/qa/desktop.png"
     source.parent.mkdir(parents=True)
     source.write_bytes(PNG)
     store.import_game("moon", result)

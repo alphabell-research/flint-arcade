@@ -34,7 +34,7 @@ def test_repair_uses_json_constraints_and_fresh_context(monkeypatch,tmp_path):
     requests=[]
     def handle(request):
         body=json.loads(request.content);requests.append(body)
-        return httpx.Response(200,json={'choices':[{'message':{'content':edits((1,'circle(1,2,3,"red")'))},'finish_reason':'stop'}]})
+        return httpx.Response(200,json={'choices':[{'message':{'content':edits((1,'circle(1,2,3,"red")')),'reasoning_content':'private planning, never executable'},'finish_reason':'stop'}]})
     original=httpx.AsyncClient
     monkeypatch.setattr(httpx,'AsyncClient',lambda **kwargs:original(**(kwargs|{'transport':httpx.MockTransport(handle)})))
     settings=Settings(data_dir=tmp_path,upstream_url='https://example.invalid/v1',upstream_model='flint')
@@ -45,7 +45,9 @@ def test_repair_uses_json_constraints_and_fresh_context(monkeypatch,tmp_path):
     assert 'grammar' not in body and body['response_format']['schema']==generation.REPAIR_SCHEMA
     assert len(body['messages'])==2 and source in body['messages'][1]['content']
     assert 'arc needs 5 arguments' in body['messages'][1]['content']
-    assert body['temperature']==.2 and body['reasoning_budget_tokens']==0
+    assert body['temperature']==.2 and body['reasoning_budget_tokens']==1024
+    assert body['chat_template_kwargs']=={'enable_thinking':True}
+    assert 'private planning' not in content
 
 
 def test_canvas_hints_find_all_bad_calls_without_counting_nested_commas():
@@ -66,6 +68,12 @@ def test_line_edits_preserve_endings_and_allow_removing_a_line():
 
 def test_unchanged_line_does_not_discard_a_valid_fix():
     assert generation.apply_edits('broken\ncorrect',edits((1,'fixed'),(2,'correct'))) == 'fixed\ncorrect'
+
+
+@pytest.mark.parametrize('limit',[-1,5,True])
+def test_repair_rounds_remain_hard_bounded(limit):
+    with pytest.raises(ValueError):
+        Settings(max_repairs=limit)
 
 
 def test_invalid_patch_preserves_browser_feedback_and_current_source(monkeypatch,tmp_path):

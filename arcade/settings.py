@@ -48,6 +48,7 @@ class Settings:
     queue_cap: int = field(default_factory=lambda: int(os.environ.get("ARCADE_QUEUE_CAP", "8")))
     job_timeout: float = field(default_factory=lambda: float(os.environ.get("ARCADE_JOB_TIMEOUT", "600")))
     max_attempts: int = 2
+    max_repairs: int = 4
     poll_seconds: float = 0.4
     worker_enabled: bool = True
     max_html_bytes: int = 1_500_000
@@ -65,6 +66,8 @@ class Settings:
             raise ValueError("Invalid cookie settings")
         if self.per_hour < 1 or self.daily_cap < 1 or self.queue_cap < 1 or self.job_timeout <= 0 or self.max_attempts < 1:
             raise ValueError("Invalid queue limits")
+        if type(self.max_repairs) is not int or not 0 <= self.max_repairs <= 4:
+            raise ValueError("Repair rounds must be between zero and four")
         if self.trusted_proxy_hops < 0:
             raise ValueError("Invalid trusted proxy hops")
         if self.trusted_proxy_hops and not self.trusted_proxy_cidrs:

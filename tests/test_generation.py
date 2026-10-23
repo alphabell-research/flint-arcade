@@ -91,7 +91,8 @@ def test_generate_repairs_with_measured_feedback(monkeypatch, tmp_path, checked_
     assert len(result['provenance']['attempts']) == 2
 
 
-def test_generate_never_exceeds_two_repairs(monkeypatch, tmp_path, checked_model):
+@pytest.mark.parametrize('limit',[0,2,4])
+def test_generate_never_exceeds_configured_repairs(monkeypatch, tmp_path, checked_model, limit):
     count = 0
     async def complete(messages, settings):
         nonlocal count
@@ -104,8 +105,8 @@ def test_generate_never_exceeds_two_repairs(monkeypatch, tmp_path, checked_model
         return json.dumps({'edits':[{'line':2,'replace':document.splitlines()[1].replace('broken','still broken')}]}), {}, {}
     monkeypatch.setattr(generation, '_repair', repair)
     async def stage(name): pass
-    result = asyncio.run(generation.generate('tiny moon',None,stage,config(tmp_path)))
-    assert count == 3 and result['qa']['accepted'] is False
+    result = asyncio.run(generation.generate('tiny moon',None,stage,config(tmp_path,max_repairs=limit)))
+    assert count == limit + 1 and result['qa']['accepted'] is False
 
 
 def test_generation_disabled_before_any_request(tmp_path):

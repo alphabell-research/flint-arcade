@@ -153,7 +153,7 @@ class Storage:
             return False
         provenance = result.get("provenance", {})
         run_id, attempts = provenance.get("run_id"), provenance.get("attempts")
-        if not isinstance(run_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", run_id) or not isinstance(attempts, list) or not 1 <= len(attempts) <= 3:
+        if not isinstance(run_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", run_id) or not isinstance(attempts, list) or not 1 <= len(attempts) <= 5:
             return False
         source = self.data_dir / "builds" / run_id / str(len(attempts)) / "qa" / "desktop.png"
         if any(part.is_symlink() for part in (source, *source.parents[:4])) or not source.is_file() or source.stat().st_size > 5_000_000:

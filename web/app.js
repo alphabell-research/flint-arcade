@@ -30,7 +30,7 @@
       let data;
       try { data = await response.json(); } catch (_) { data = {}; }
       if (!response.ok) {
-        const error = new Error(response.status === 429 ? 'The arcade is busy. Give it a moment, then try again.' : response.status === 503 ? 'Flint is taking a break. You can still play the collection.' : response.status === 404 ? 'This game is no longer available.' : 'We couldn’t finish that request. Please try again.');
+        const error = new Error(response.status === 429 ? 'The build limit has been reached. Please try again later.' : response.status === 503 ? 'Flint is taking a break. You can still play the collection.' : response.status === 404 ? 'This game is no longer available.' : 'We couldn’t finish that request. Please try again.');
         error.status = response.status;
         throw error;
       }
